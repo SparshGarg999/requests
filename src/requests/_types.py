@@ -43,99 +43,61 @@ class SupportsItems(Protocol[_KT_co, _VT_co]):
 HookType: TypeAlias = Callable[["Response"], Any]
 HooksInputType: TypeAlias = Mapping[str, Iterable[HookType] | HookType]
 
-
-def is_prepared(request: PreparedRequest) -> TypeIs[_ValidatedRequest]:
-    """Verify a PreparedRequest has been fully prepared."""
-    if TYPE_CHECKING:
-        return request.url is not None and request.method is not None
-    # noop at runtime to avoid AssertionError
-    return True
-
-
 if TYPE_CHECKING:
     from http.cookiejar import CookieJar
-    from typing import TypeAlias, TypedDict
+    from typing_extensions import Self, TypedDict, TypeIs
 
-    from typing_extensions import (
-        Buffer,  # TODO: move to collections.abc when Python >= 3.12
-        TypeIs,  # TODO: move to typing when Python >= 3.13
-    )
-
-    from .auth import AuthBase
     from .cookies import RequestsCookieJar
-    from .models import PreparedRequest, Response
-    from .structures import CaseInsensitiveDict
+    from .models import PreparedRequest, Request, Response
 
-    class _ValidatedRequest(PreparedRequest):
-        """Subtype asserting a PreparedRequest has been fully prepared before calling.
-
-        The override suppression is required because mutable attribute types are
-        invariant (Liskov), but we only narrow after preparation is complete. This
-        is the explicit contract for Requests but Python's typing doesn't have a
-        better way to represent the requirement.
-        """
-
-        url: str  # type: ignore[reportIncompatibleVariableOverride]
-        method: str  # type: ignore[reportIncompatibleVariableOverride]
-
-    # Type aliases for core API concepts (ordered by request() signature)
-    UriType: TypeAlias = str | bytes
-
-    _ParamsMappingKeyType: TypeAlias = str | bytes | int | float
-    _ParamsMappingValueType: TypeAlias = (
-        str | bytes | int | float | Iterable[str | bytes | int | float] | None
-    )
-    ParamsType: TypeAlias = (
-        SupportsItems[_ParamsMappingKeyType, _ParamsMappingValueType]
-        | tuple[tuple[_ParamsMappingKeyType, _ParamsMappingValueType], ...]
-        | Iterable[tuple[_ParamsMappingKeyType, _ParamsMappingValueType]]
-        | str
-        | bytes
-        | None
-    )
-
-    KVDataType: TypeAlias = Iterable[tuple[Any, Any]] | SupportsItems[Any, Any]
-
-    RawDataType: TypeAlias = KVDataType | str | bytes
-    StreamDataType: TypeAlias = SupportsRead[str | bytes]
-    EncodableDataType: TypeAlias = RawDataType | StreamDataType
-
-    DataType: TypeAlias = (
-        KVDataType
-        | Iterable[bytes | str]
-        | str
-        | bytes
-        | Buffer
-        | SupportsRead[str | bytes]
-        | None
-    )
-
-    BodyType: TypeAlias = (
-        bytes | str | Iterable[bytes | str] | SupportsRead[bytes | str] | None
-    )
-
-    HeadersType: TypeAlias = Mapping[str, str | bytes] | None
-
-    CookiesType: TypeAlias = RequestsCookieJar | Mapping[str, str]
-
-    # Building blocks for FilesType
-    _FileName: TypeAlias = str | None
-    _FileContent: TypeAlias = SupportsRead[str | bytes] | str | bytes
-    _FileSpecBasic: TypeAlias = tuple[_FileName, _FileContent]
-    _FileSpecWithContentType: TypeAlias = tuple[_FileName, _FileContent, str]
-    _FileSpecWithHeaders: TypeAlias = tuple[
-        _FileName, _FileContent, str, CaseInsensitiveDict[str] | Mapping[str, str]
-    ]
-    _FileSpec: TypeAlias = (
-        _FileContent | _FileSpecBasic | _FileSpecWithContentType | _FileSpecWithHeaders
-    )
-    FilesType: TypeAlias = (
-        Mapping[str, _FileSpec] | Iterable[tuple[str, _FileSpec]] | None
+    QueryParamValue: TypeAlias = str | bytes | int | float | None
+    QueryParams: TypeAlias = (
+        Mapping[str, QueryParamValue | Sequence[QueryParamValue]]
+        | Sequence[tuple[str, QueryParamValue]]
     )
 
     AuthType: TypeAlias = (
-        tuple[str, str] | AuthBase | Callable[[PreparedRequest], PreparedRequest] | None
+        tuple[str, str]
+        | Callable[[PreparedRequest], PreparedRequest]
+        | None
     )
+
+    HeadersType: TypeAlias = (
+        Mapping[str, str | bytes | None]
+        | Mapping[bytes, str | bytes | None]
+    )
+
+    # Used for data= parameter
+    # File-like objects, mappings, lists of tuples, strings, bytes
+    DataType: TypeAlias = (
+        Any
+    )
+
+    # Form tuples for files=
+    FileContent: TypeAlias = (
+        SupportsRead[str | bytes]
+        | str
+        | bytes
+    )
+
+    FileTuple2: TypeAlias = tuple[str | None, FileContent]
+    FileTuple3: TypeAlias = tuple[str | None, FileContent, str]
+    FileTuple4: TypeAlias = tuple[str | None, FileContent, str, Mapping[str, str]]
+    FileValue: TypeAlias = (
+        FileContent
+        | FileTuple2
+        | FileTuple3
+        | FileTuple4
+    )
+
+    FilesType: TypeAlias = (
+        Mapping[str, FileValue]
+        | Sequence[tuple[str, FileValue]]
+    )
+
+    UriType: TypeAlias = str | bytes
+
+    ParamsType: TypeAlias = QueryParams | bytes | str | None
 
     TimeoutType: TypeAlias = float | tuple[float | None, float | None] | None
     ProxiesType: TypeAlias = MutableMapping[str, str]
@@ -150,6 +112,7 @@ if TYPE_CHECKING:
         | str
         | Sequence["JsonType"]
         | Mapping[str, "JsonType"]
+        | Any
     )
 
     # TypedDicts for Unpack kwargs (PEP 692)
